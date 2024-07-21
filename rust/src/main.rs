@@ -16,6 +16,7 @@
 use evm::evm;
 use primitive_types::U256;
 use serde::Deserialize;
+use colored::Colorize;
 
 #[derive(Debug, Deserialize)]
 struct Evmtest {
@@ -47,6 +48,9 @@ fn main() {
     let total = data.len();
 
     for (index, test) in data.iter().enumerate() {
+        println!();
+        println!("======================================");
+        println!();
         println!("Test {} of {}: {}", index + 1, total, test.name);
 
         let code: Vec<u8> = hex::decode(&test.code.bin).unwrap();
@@ -73,7 +77,7 @@ fn main() {
         matching = matching && result.success == test.expect.success;
 
         if !matching {
-            println!("Instructions: \n{}\n", test.code.asm);
+            println!("Instructions: \n{}\n", test.code.asm.purple());
 
             println!("Expected success: {:?}", test.expect.success);
             println!("Expected stack: [");
@@ -93,7 +97,8 @@ fn main() {
             println!("Progress: {}/{}\n\n", index, total);
             panic!("Test failed");
         }
-        println!("PASS");
+        println!("{}", "PASS".green());
     }
     println!("Congratulations!");
 }
+
