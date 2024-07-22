@@ -64,6 +64,22 @@ pub fn evm(code: &Vec<u8>) -> EvmResult {
                 operations::swap(offset as usize, &mut stack);
             },
             opcodes::PC => stack.push((pc - 1).into()),
+            opcodes::GAS => stack.push(U256::MAX),
+            opcodes::JUMP => {
+                let res = operations::jump(&mut stack, code, &mut pc);
+                if let Err(_) = res {
+                    success = false;
+                    break;
+                }
+            },
+            opcodes::JUMPI => {
+                let res = operations::jump_if(&mut stack, code, &mut pc);
+                if let Err(_) = res {
+                    success = false;
+                    break;
+                }
+            },
+            opcodes::JUMPDEST => continue,
             _ => {
                 success = false;
                 break;
