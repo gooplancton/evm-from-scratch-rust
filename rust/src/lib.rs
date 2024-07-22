@@ -9,10 +9,8 @@ pub struct EvmResult {
     pub success: bool,
 }
 
-const RAM_CAPACITY: usize = 1064;
-
 pub fn evm(code: &Vec<u8>) -> EvmResult {
-    let _memory: [U256; RAM_CAPACITY] = [U256::zero(); RAM_CAPACITY];
+    let mut memory: Vec<u8> = Vec::new();
     let mut stack: Vec<U256> = Vec::new();
     let mut pc = 0;
     let mut success = true;
@@ -80,6 +78,10 @@ pub fn evm(code: &Vec<u8>) -> EvmResult {
                 }
             },
             opcodes::JUMPDEST => continue,
+            opcodes::MSIZE => operations::memsize(&mut stack, &memory),
+            opcodes::MSTORE => operations::memstore(&mut stack, &mut memory),
+            opcodes::MSTORE8 => operations::memstore8(&mut stack, &mut memory),
+            opcodes::MLOAD => operations::memload(&mut stack, &mut memory),
             _ => {
                 success = false;
                 break;
