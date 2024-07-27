@@ -13,7 +13,9 @@
  * to Rust, implement EVM in another programming language first.
  */
 
+use std::mem;
 use evm::evm;
+use evm::state;
 use primitive_types::U256;
 use serde::Deserialize;
 use colored::Colorize;
@@ -24,6 +26,8 @@ struct Evmtest {
     hint: String,
     code: Code,
     expect: Expect,
+    tx: Option<state::TxData>,
+    block: Option<state::BlockData>
 }
 
 #[derive(Debug, Deserialize)]
@@ -43,19 +47,23 @@ struct Expect {
 
 fn main() {
     let text = std::fs::read_to_string("../evm.json").unwrap();
-    let data: Vec<Evmtest> = serde_json::from_str(&text).unwrap();
+    let mut data: Vec<Evmtest> = serde_json::from_str(&text).unwrap();
 
     let total = data.len();
 
-    for (index, test) in data.iter().enumerate() {
+    for (index, test) in data.iter_mut().enumerate() {
         println!();
         println!("======================================");
         println!();
         println!("Test {} of {}: {}", index + 1, total, test.name);
 
         let code: Vec<u8> = hex::decode(&test.code.bin).unwrap();
+        let chain_state = state::BlockchainState {
+            tx: mem::take(&mut test.tx),
+            block: mem::take(&mut test.block)
+        };
 
-        let result = evm(&code);
+        let result = evm(&code, &chain_state);
 
         let mut expected_stack: Vec<U256> = Vec::new();
         if let Some(ref stacks) = test.expect.stack {
