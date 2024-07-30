@@ -11,7 +11,7 @@ pub struct EvmResult {
     pub success: bool,
 }
 
-pub fn evm(code: &Vec<u8>, chain_state: &BlockchainState) -> EvmResult {
+pub fn evm(code: &Vec<u8>, chain_state: &mut BlockchainState) -> EvmResult {
     let mut memory: Vec<u8> = Vec::new();
     let mut stack: Vec<U256> = Vec::new();
     let mut pc = 0;
@@ -80,56 +80,36 @@ pub fn evm(code: &Vec<u8>, chain_state: &BlockchainState) -> EvmResult {
                     break;
                 }
             }
-            opcodes::JUMPDEST => continue,
             opcodes::MSIZE => operations::memsize(&mut stack, &memory),
             opcodes::MSTORE => operations::memstore(&mut stack, &mut memory),
             opcodes::MSTORE8 => operations::memstore8(&mut stack, &mut memory),
             opcodes::MLOAD => operations::memload(&mut stack, &mut memory),
-            opcodes::ADDRESS => {
-                let address = chain_state.tx.clone().unwrap().to.unwrap();
-                stack.push(address.parse().unwrap());
-            }
-            opcodes::CALLER => {
-                let caller = chain_state.tx.clone().unwrap().from.unwrap();
-                stack.push(caller.parse().unwrap());
-            }
-            opcodes::ORIGIN => {
-                let origin = chain_state.tx.clone().unwrap().origin.unwrap();
-                stack.push(origin.parse().unwrap());
-            }
-            opcodes::GASPRICE => {
-                let gasprice = chain_state.tx.clone().unwrap().gasprice.unwrap();
-                stack.push(gasprice.parse().unwrap());
-            }
-            opcodes::BLOCKHASH => continue, // NOTE: not implemented
-            opcodes::BASEFEE => {
-                let basefee = chain_state.block.clone().unwrap().basefee.unwrap();
-                stack.push(basefee.parse().unwrap());
-            }
-            opcodes::COINBASE => {
-                let coinbase = chain_state.block.clone().unwrap().coinbase.unwrap();
-                stack.push(coinbase.parse().unwrap());
-            }
-            opcodes::TIMESTAMP => {
-                let timestamp = chain_state.block.clone().unwrap().timestamp.unwrap();
-                stack.push(timestamp.parse().unwrap());
-            }
-            opcodes::NUMBER => {
-                let number = chain_state.block.clone().unwrap().number.unwrap();
-                stack.push(number.parse().unwrap());
-            }
-            opcodes::DIFFICULTY => {
-                let difficulty = chain_state.block.clone().unwrap().difficulty.unwrap();
-                stack.push(difficulty.parse().unwrap());
-            }
-            opcodes::GASLIMIT => {
-                let gaslimit = chain_state.block.clone().unwrap().gaslimit.unwrap();
-                stack.push(gaslimit.parse().unwrap());
-            }
-            opcodes::CHAINID => {
-                let chainid = chain_state.block.clone().unwrap().chainid.unwrap();
-                stack.push(chainid.parse().unwrap());
+            opcodes::ADDRESS => stack.push(chain_state.tx.to.unwrap().into()),
+            opcodes::CALLER => stack.push(chain_state.tx.from.unwrap().into()),
+            opcodes::ORIGIN => stack.push(chain_state.tx.origin.unwrap().into()),
+            opcodes::GASPRICE => stack.push(chain_state.tx.gasprice.unwrap().into()),
+            opcodes::BASEFEE => stack.push(chain_state.block.basefee.unwrap().into()),
+            opcodes::COINBASE => stack.push(chain_state.block.coinbase.unwrap().into()),
+            opcodes::TIMESTAMP => stack.push(chain_state.block.timestamp.unwrap().into()),
+            opcodes::NUMBER => stack.push(chain_state.block.number.unwrap().into()),
+            opcodes::DIFFICULTY => stack.push(chain_state.block.difficulty.unwrap().into()),
+            opcodes::GASLIMIT => stack.push(chain_state.block.gaslimit.unwrap().into()),
+            opcodes::CHAINID => stack.push(chain_state.block.chainid.unwrap().into()),
+            opcodes::CALLVALUE => operations::call_value(&mut stack, chain_state),
+            opcodes::CALLDATALOAD => operations::call_data_load(&mut stack, chain_state),
+            opcodes::CALLDATASIZE => operations::call_data_size(&mut stack, chain_state),
+            opcodes::CALLDATACOPY => {
+                operations::call_data_copy(&mut stack, &mut memory, chain_state)
             },
+            opcodes::CODESIZE => stack.push(code.len().into()),
+            opcodes::CODECOPY => operations::code_copy(&mut stack, &mut memory, code),
+            opcodes::EXTCODESIZE => operations::external_code_size(&mut stack, chain_state),
+            opcodes::EXTCODECOPY => operations::external_code_copy(&mut stack, &mut memory, chain_state),
+            opcodes::EXTCODEHASH => operations::external_code_hash(&mut stack, chain_state),
+            opcodes::BALANCE => operations::get_balance(&mut stack, chain_state),
+            opcodes::SELFBALANCE => operations::self_balance(&mut stack, chain_state),
+            opcodes::JUMPDEST => continue,
+            opcodes::BLOCKHASH => continue, // NOTE: not implemented
             _ => {
                 success = false;
                 break;

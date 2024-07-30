@@ -27,7 +27,8 @@ struct Evmtest {
     code: Code,
     expect: Expect,
     tx: Option<state::TxData>,
-    block: Option<state::BlockData>
+    block: Option<state::BlockData>,
+    state: Option<state::ContractsStateData>
 }
 
 #[derive(Debug, Deserialize)]
@@ -58,12 +59,13 @@ fn main() {
         println!("Test {} of {}: {}", index + 1, total, test.name);
 
         let code: Vec<u8> = hex::decode(&test.code.bin).unwrap();
-        let chain_state = state::BlockchainState {
-            tx: mem::take(&mut test.tx),
-            block: mem::take(&mut test.block)
+        let mut chain_state = state::BlockchainState {
+            tx: mem::take(&mut test.tx).unwrap_or_default(),
+            block: mem::take(&mut test.block).unwrap_or_default(),
+            contracts_state: mem::take(&mut test.state).unwrap_or_default()
         };
 
-        let result = evm(&code, &chain_state);
+        let result = evm(&code, &mut chain_state);
 
         let mut expected_stack: Vec<U256> = Vec::new();
         if let Some(ref stacks) = test.expect.stack {
