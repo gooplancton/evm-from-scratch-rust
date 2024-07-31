@@ -3,6 +3,8 @@ mod opcodes;
 mod operations;
 pub mod state;
 
+use std::collections::HashMap;
+
 use primitive_types::U256;
 use state::BlockchainState;
 
@@ -17,6 +19,7 @@ pub fn evm(code: &Vec<u8>, chain_state: &mut BlockchainState) -> EvmResult {
     let mut pc = 0;
     let mut success = true;
     let code_length = code.len();
+    let mut storage = HashMap::<U256, U256>::default();
 
     while pc < code_length {
         let opcode = code[pc];
@@ -108,6 +111,8 @@ pub fn evm(code: &Vec<u8>, chain_state: &mut BlockchainState) -> EvmResult {
             opcodes::EXTCODEHASH => operations::external_code_hash(&mut stack, chain_state),
             opcodes::BALANCE => operations::get_balance(&mut stack, chain_state),
             opcodes::SELFBALANCE => operations::self_balance(&mut stack, chain_state),
+            opcodes::SLOAD => operations::storage_load(&mut stack, &mut storage),
+            opcodes::SSTORE => operations::storage_store(&mut stack, &mut storage),
             opcodes::JUMPDEST => continue,
             opcodes::BLOCKHASH => continue, // NOTE: not implemented
             _ => {

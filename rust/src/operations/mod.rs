@@ -7,6 +7,7 @@ mod hash;
 mod balance;
 mod call;
 mod code;
+mod storage;
 
 pub use math::*;
 pub use push::*;
@@ -17,4 +18,5 @@ pub use hash::*;
 pub use balance::*;
 pub use call::*;
 pub use code::*;
+pub use storage::*;
 
