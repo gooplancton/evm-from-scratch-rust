@@ -8,8 +8,16 @@ use std::collections::HashMap;
 use primitive_types::U256;
 use state::BlockchainState;
 
+#[derive(Debug, serde::Deserialize, PartialEq, Eq)]
+pub struct EvmLog {
+    pub address: String,
+    pub data: String,
+    pub topics: Vec<String>,
+}
+
 pub struct EvmResult {
     pub stack: Vec<U256>,
+    pub logs: Vec<EvmLog>,
     pub success: bool,
 }
 
@@ -20,6 +28,7 @@ pub fn evm(code: &Vec<u8>, chain_state: &mut BlockchainState) -> EvmResult {
     let mut success = true;
     let code_length = code.len();
     let mut storage = HashMap::<U256, U256>::default();
+    let mut logs = Vec::<EvmLog>::new();
 
     while pc < code_length {
         let opcode = code[pc];
@@ -71,14 +80,14 @@ pub fn evm(code: &Vec<u8>, chain_state: &mut BlockchainState) -> EvmResult {
             opcodes::GAS => stack.push(U256::MAX),
             opcodes::JUMP => {
                 let res = operations::jump(&mut stack, code, &mut pc);
-                if let Err(_) = res {
+                if res.is_err() {
                     success = false;
                     break;
                 }
             }
             opcodes::JUMPI => {
                 let res = operations::jump_if(&mut stack, code, &mut pc);
-                if let Err(_) = res {
+                if res.is_err() {
                     success = false;
                     break;
                 }
@@ -103,18 +112,25 @@ pub fn evm(code: &Vec<u8>, chain_state: &mut BlockchainState) -> EvmResult {
             opcodes::CALLDATASIZE => operations::call_data_size(&mut stack, chain_state),
             opcodes::CALLDATACOPY => {
                 operations::call_data_copy(&mut stack, &mut memory, chain_state)
-            },
+            }
             opcodes::CODESIZE => stack.push(code.len().into()),
             opcodes::CODECOPY => operations::code_copy(&mut stack, &mut memory, code),
             opcodes::EXTCODESIZE => operations::external_code_size(&mut stack, chain_state),
-            opcodes::EXTCODECOPY => operations::external_code_copy(&mut stack, &mut memory, chain_state),
+            opcodes::EXTCODECOPY => {
+                operations::external_code_copy(&mut stack, &mut memory, chain_state)
+            }
             opcodes::EXTCODEHASH => operations::external_code_hash(&mut stack, chain_state),
             opcodes::BALANCE => operations::get_balance(&mut stack, chain_state),
             opcodes::SELFBALANCE => operations::self_balance(&mut stack, chain_state),
             opcodes::SLOAD => operations::storage_load(&mut stack, &mut storage),
             opcodes::SSTORE => operations::storage_store(&mut stack, &mut storage),
+            opcodes::LOG0..=opcodes::LOG4 => {
+                let n_topics = opcode - opcodes::LOG0;
+                let log = operations::log(n_topics, &mut stack, &mut memory, chain_state);
+                logs.push(log);
+            }
             opcodes::JUMPDEST => continue,
-            opcodes::BLOCKHASH => continue, // NOTE: not implemented
+            opcodes::BLOCKHASH => continue, // NOTE: not implemented in the test suite
             _ => {
                 success = false;
                 break;
@@ -124,5 +140,9 @@ pub fn evm(code: &Vec<u8>, chain_state: &mut BlockchainState) -> EvmResult {
 
     stack.reverse();
 
-    EvmResult { stack, success }
+    EvmResult {
+        stack,
+        success,
+        logs,
+    }
 }

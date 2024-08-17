@@ -8,6 +8,7 @@ mod balance;
 mod call;
 mod code;
 mod storage;
+mod log;
 
 pub use math::*;
 pub use push::*;
@@ -19,4 +20,5 @@ pub use balance::*;
 pub use call::*;
 pub use code::*;
 pub use storage::*;
+pub use log::*;
 

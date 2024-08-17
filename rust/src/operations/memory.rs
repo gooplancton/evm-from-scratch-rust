@@ -1,5 +1,3 @@
-use std::cmp::min;
-
 use primitive_types::U256;
 
 fn expand_memory(memory: &mut Vec<u8>, new_size: usize) {
@@ -11,6 +9,21 @@ fn expand_memory(memory: &mut Vec<u8>, new_size: usize) {
     };
 
     memory.append(&mut vec![0u8; new_size + padding - current_size + 1]);
+}
+
+pub fn read_memory_bytes(memory: &mut Vec<u8>, offset: usize, size: usize) -> Vec<u8> {
+    let current_size = memory.len();
+    let new_size = offset + size - 1;
+    if new_size >= current_size {
+        expand_memory(memory, new_size);
+    }
+
+    let mut bytes = Vec::<u8>::new();
+    for i in offset..=new_size {
+        bytes.push(memory[i].into());
+    }
+
+    bytes
 }
 
 pub fn read_memory(memory: &mut Vec<u8>, offset: usize) -> U256 {
@@ -69,7 +82,7 @@ pub fn memload(stack: &mut Vec<U256>, memory: &mut Vec<u8>) {
     stack.push(value);
 }
 
-pub fn memsize(stack: &mut Vec<U256>, memory: &Vec<u8>) {
+pub fn memsize(stack: &mut Vec<U256>, memory: &[u8]) {
     stack.push(memory.len().into());
 }
 

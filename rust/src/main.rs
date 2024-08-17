@@ -1,3 +1,10 @@
+use colored::Colorize;
+use evm::evm;
+use evm::state;
+use evm::EvmLog;
+use primitive_types::U256;
+use serde::Deserialize;
+use std::borrow::Borrow;
 /**
  * EVM From Scratch
  * Rust template
@@ -12,13 +19,7 @@
  * gave up and switched to JavaScript, Python, or Go. If you are new
  * to Rust, implement EVM in another programming language first.
  */
-
 use std::mem;
-use evm::evm;
-use evm::state;
-use primitive_types::U256;
-use serde::Deserialize;
-use colored::Colorize;
 
 #[derive(Debug, Deserialize)]
 struct Evmtest {
@@ -28,7 +29,8 @@ struct Evmtest {
     expect: Expect,
     tx: Option<state::TxData>,
     block: Option<state::BlockData>,
-    state: Option<state::ContractsStateData>
+    state: Option<state::ContractsStateData>,
+    logs: Option<Vec<EvmLog>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -40,19 +42,19 @@ struct Code {
 #[derive(Debug, Deserialize)]
 struct Expect {
     stack: Option<Vec<String>>,
+    logs: Option<Vec<EvmLog>>,
     success: bool,
     // #[serde(rename = "return")]
     // ret: Option<String>,
 }
 
-
 fn main() {
     let text = std::fs::read_to_string("../evm.json").unwrap();
-    let mut data: Vec<Evmtest> = serde_json::from_str(&text).unwrap();
+    let data: Vec<Evmtest> = serde_json::from_str(&text).unwrap();
 
     let total = data.len();
 
-    for (index, test) in data.iter_mut().enumerate() {
+    for (index, mut test) in data.into_iter().enumerate() {
         println!();
         println!("======================================");
         println!();
@@ -62,7 +64,7 @@ fn main() {
         let mut chain_state = state::BlockchainState {
             tx: mem::take(&mut test.tx).unwrap_or_default(),
             block: mem::take(&mut test.block).unwrap_or_default(),
-            contracts_state: mem::take(&mut test.state).unwrap_or_default()
+            contracts_state: mem::take(&mut test.state).unwrap_or_default(),
         };
 
         let result = evm(&code, &mut chain_state);
@@ -83,8 +85,11 @@ fn main() {
                 }
             }
         }
-        
-        matching = matching && result.success == test.expect.success;
+
+        let logs_ok =
+            test.expect.logs.is_none() || test.expect.logs.as_ref().unwrap() == &result.logs;
+
+        matching = logs_ok && matching && result.success == test.expect.success;
 
         if !matching {
             println!("Instructions: \n{}\n", test.code.asm.purple());
@@ -95,11 +100,25 @@ fn main() {
                 println!("  {:#X},", v);
             }
             println!("]\n");
-            
+
+            if let Some(ref expected_logs) = test.expect.logs {
+                println!("Expected logs: [");
+                for log in expected_logs {
+                    println!("  {:#?},", log);
+                }
+                println!("]\n");
+            }
+
             println!("Actual success: {:?}", result.success);
             println!("Actual stack: [");
             for v in result.stack {
                 println!("  {:#X},", v);
+            }
+            println!("]\n");
+
+            println!("Actual logs: [");
+            for log in result.logs {
+                println!("  {:#?},", log);
             }
             println!("]\n");
 
@@ -111,4 +130,3 @@ fn main() {
     }
     println!("Congratulations!");
 }
-
