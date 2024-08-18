@@ -30,7 +30,6 @@ struct Evmtest {
     tx: Option<state::TxData>,
     block: Option<state::BlockData>,
     state: Option<state::ContractsStateData>,
-    logs: Option<Vec<EvmLog>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -44,8 +43,8 @@ struct Expect {
     stack: Option<Vec<String>>,
     logs: Option<Vec<EvmLog>>,
     success: bool,
-    // #[serde(rename = "return")]
-    // ret: Option<String>,
+    #[serde(rename = "return")]
+    ret: Option<String>,
 }
 
 fn main() {
@@ -89,12 +88,15 @@ fn main() {
         let logs_ok =
             test.expect.logs.is_none() || test.expect.logs.as_ref().unwrap() == &result.logs;
 
-        matching = logs_ok && matching && result.success == test.expect.success;
+        let ret_ok = test.expect.ret == result.ret;
+
+        matching = ret_ok && logs_ok && matching && result.success == test.expect.success;
 
         if !matching {
             println!("Instructions: \n{}\n", test.code.asm.purple());
 
             println!("Expected success: {:?}", test.expect.success);
+            println!("Expected return: {:?}", test.expect.ret);
             println!("Expected stack: [");
             for v in expected_stack {
                 println!("  {:#X},", v);
@@ -110,6 +112,7 @@ fn main() {
             }
 
             println!("Actual success: {:?}", result.success);
+            println!("Actual return: {:?}", result.ret);
             println!("Actual stack: [");
             for v in result.stack {
                 println!("  {:#X},", v);

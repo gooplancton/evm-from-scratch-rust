@@ -19,6 +19,7 @@ pub struct EvmResult {
     pub stack: Vec<U256>,
     pub logs: Vec<EvmLog>,
     pub success: bool,
+    pub ret: Option<String>,
 }
 
 pub fn evm(code: &Vec<u8>, chain_state: &mut BlockchainState) -> EvmResult {
@@ -29,6 +30,7 @@ pub fn evm(code: &Vec<u8>, chain_state: &mut BlockchainState) -> EvmResult {
     let code_length = code.len();
     let mut storage = HashMap::<U256, U256>::default();
     let mut logs = Vec::<EvmLog>::new();
+    let mut ret: Option<String> = None;
 
     while pc < code_length {
         let opcode = code[pc];
@@ -129,6 +131,16 @@ pub fn evm(code: &Vec<u8>, chain_state: &mut BlockchainState) -> EvmResult {
                 let log = operations::log(n_topics, &mut stack, &mut memory, chain_state);
                 logs.push(log);
             }
+            opcodes::RETURN => {
+                let return_value = operations::return_value(&mut stack, &mut memory);
+                ret = Some(hex::encode(return_value));
+            },
+            opcodes::REVERT => {
+                let return_value = operations::revert_context(&mut stack, &mut memory);
+                ret = Some(hex::encode(return_value));
+                success = false;
+                break;
+            }
             opcodes::JUMPDEST => continue,
             opcodes::BLOCKHASH => continue, // NOTE: not implemented in the test suite
             _ => {
@@ -144,5 +156,6 @@ pub fn evm(code: &Vec<u8>, chain_state: &mut BlockchainState) -> EvmResult {
         stack,
         success,
         logs,
+        ret,
     }
 }
