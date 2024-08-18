@@ -5,6 +5,7 @@ use evm::EvmLog;
 use primitive_types::U256;
 use serde::Deserialize;
 use std::borrow::Borrow;
+use std::collections::HashMap;
 /**
  * EVM From Scratch
  * Rust template
@@ -66,7 +67,10 @@ fn main() {
             contracts_state: mem::take(&mut test.state).unwrap_or_default(),
         };
 
-        let result = evm(&code, &mut chain_state);
+        let mut memory = Vec::<u8>::new();
+        let mut storage = HashMap::<U256, U256>::new();
+
+        let result = evm(&code, &mut memory, &mut storage, &mut chain_state, false);
 
         let mut expected_stack: Vec<U256> = Vec::new();
         if let Some(ref stacks) = test.expect.stack {
@@ -88,7 +92,7 @@ fn main() {
         let logs_ok =
             test.expect.logs.is_none() || test.expect.logs.as_ref().unwrap() == &result.logs;
 
-        let ret_ok = test.expect.ret == result.ret;
+        let ret_ok = test.expect.ret == result.ret.as_ref().map(hex::encode);
 
         matching = ret_ok && logs_ok && matching && result.success == test.expect.success;
 

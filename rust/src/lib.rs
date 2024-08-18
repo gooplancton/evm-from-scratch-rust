@@ -5,6 +5,7 @@ pub mod state;
 
 use std::collections::HashMap;
 
+use operations::{write_memory, ContextType};
 use primitive_types::U256;
 use state::BlockchainState;
 
@@ -19,18 +20,23 @@ pub struct EvmResult {
     pub stack: Vec<U256>,
     pub logs: Vec<EvmLog>,
     pub success: bool,
-    pub ret: Option<String>,
+    pub ret: Option<Vec<u8>>,
 }
 
-pub fn evm(code: &Vec<u8>, chain_state: &mut BlockchainState) -> EvmResult {
-    let mut memory: Vec<u8> = Vec::new();
+pub fn evm(
+    code: &Vec<u8>,
+    memory: &mut Vec<u8>,
+    storage: &mut HashMap<U256, U256>,
+    chain_state: &mut BlockchainState,
+    is_static: bool,
+) -> EvmResult {
     let mut stack: Vec<U256> = Vec::new();
     let mut pc = 0;
     let mut success = true;
     let code_length = code.len();
-    let mut storage = HashMap::<U256, U256>::default();
     let mut logs = Vec::<EvmLog>::new();
-    let mut ret: Option<String> = None;
+    let mut ret: Option<Vec<u8>> = None;
+    let mut last_context_ret: Option<Vec<u8>> = None;
 
     while pc < code_length {
         let opcode = code[pc];
@@ -65,7 +71,7 @@ pub fn evm(code: &Vec<u8>, chain_state: &mut BlockchainState) -> EvmResult {
             opcodes::OR => operations::or(&mut stack),
             opcodes::XOR => operations::xor(&mut stack),
             opcodes::NOT => operations::not(&mut stack),
-            opcodes::KECCAK256 => operations::keccak256(&mut stack, &mut memory),
+            opcodes::KECCAK256 => operations::keccak256(&mut stack, memory),
             opcodes::BYTE => operations::byte(&mut stack),
             opcodes::SHL => operations::shl(&mut stack),
             opcodes::SHR => operations::shr(&mut stack),
@@ -94,10 +100,10 @@ pub fn evm(code: &Vec<u8>, chain_state: &mut BlockchainState) -> EvmResult {
                     break;
                 }
             }
-            opcodes::MSIZE => operations::memsize(&mut stack, &memory),
-            opcodes::MSTORE => operations::memstore(&mut stack, &mut memory),
-            opcodes::MSTORE8 => operations::memstore8(&mut stack, &mut memory),
-            opcodes::MLOAD => operations::memload(&mut stack, &mut memory),
+            opcodes::MSIZE => operations::memsize(&mut stack, memory),
+            opcodes::MSTORE => operations::memstore(&mut stack, memory),
+            opcodes::MSTORE8 => operations::memstore8(&mut stack, memory),
+            opcodes::MLOAD => operations::memload(&mut stack, memory),
             opcodes::ADDRESS => stack.push(chain_state.tx.to.unwrap().into()),
             opcodes::CALLER => stack.push(chain_state.tx.from.unwrap().into()),
             opcodes::ORIGIN => stack.push(chain_state.tx.origin.unwrap().into()),
@@ -112,34 +118,91 @@ pub fn evm(code: &Vec<u8>, chain_state: &mut BlockchainState) -> EvmResult {
             opcodes::CALLVALUE => operations::call_value(&mut stack, chain_state),
             opcodes::CALLDATALOAD => operations::call_data_load(&mut stack, chain_state),
             opcodes::CALLDATASIZE => operations::call_data_size(&mut stack, chain_state),
-            opcodes::CALLDATACOPY => {
-                operations::call_data_copy(&mut stack, &mut memory, chain_state)
-            }
+            opcodes::CALLDATACOPY => operations::call_data_copy(&mut stack, memory, chain_state),
             opcodes::CODESIZE => stack.push(code.len().into()),
-            opcodes::CODECOPY => operations::code_copy(&mut stack, &mut memory, code),
+            opcodes::CODECOPY => operations::code_copy(&mut stack, memory, code),
             opcodes::EXTCODESIZE => operations::external_code_size(&mut stack, chain_state),
-            opcodes::EXTCODECOPY => {
-                operations::external_code_copy(&mut stack, &mut memory, chain_state)
-            }
+            opcodes::EXTCODECOPY => operations::external_code_copy(&mut stack, memory, chain_state),
             opcodes::EXTCODEHASH => operations::external_code_hash(&mut stack, chain_state),
             opcodes::BALANCE => operations::get_balance(&mut stack, chain_state),
             opcodes::SELFBALANCE => operations::self_balance(&mut stack, chain_state),
-            opcodes::SLOAD => operations::storage_load(&mut stack, &mut storage),
-            opcodes::SSTORE => operations::storage_store(&mut stack, &mut storage),
+            opcodes::SLOAD => operations::storage_load(&mut stack, storage),
+            opcodes::SSTORE => {
+                if is_static {
+                    let return_value = operations::revert_context(&mut stack, memory);
+                    ret = Some(return_value);
+                    success = false;
+                    break;
+                }
+
+                operations::storage_store(&mut stack, storage)
+            }
             opcodes::LOG0..=opcodes::LOG4 => {
+                if is_static {
+                    let return_value = operations::revert_context(&mut stack, memory);
+                    ret = Some(return_value);
+                    success = false;
+                    break;
+                }
+
                 let n_topics = opcode - opcodes::LOG0;
-                let log = operations::log(n_topics, &mut stack, &mut memory, chain_state);
+                let log = operations::log(n_topics, &mut stack, memory, chain_state);
                 logs.push(log);
             }
             opcodes::RETURN => {
-                let return_value = operations::return_value(&mut stack, &mut memory);
-                ret = Some(hex::encode(return_value));
-            },
+                let return_value = operations::return_value(&mut stack, memory);
+                ret = Some(return_value);
+            }
             opcodes::REVERT => {
-                let return_value = operations::revert_context(&mut stack, &mut memory);
-                ret = Some(hex::encode(return_value));
+                let return_value = operations::revert_context(&mut stack, memory);
+                ret = Some(return_value);
                 success = false;
                 break;
+            }
+            opcodes::CALL => {
+                last_context_ret = operations::call_context(
+                    &mut stack,
+                    memory,
+                    chain_state,
+                    ContextType::Writeable,
+                    is_static,
+                );
+            }
+            opcodes::DELEGATECALL => {
+                last_context_ret = operations::call_context(
+                    &mut stack,
+                    memory,
+                    chain_state,
+                    ContextType::WriteableDelegate(storage),
+                    is_static,
+                );
+            }
+            opcodes::STATICCALL => {
+                last_context_ret = operations::call_context(
+                    &mut stack,
+                    memory,
+                    chain_state,
+                    ContextType::Static,
+                    is_static,
+                );
+            }
+            opcodes::RETURNDATASIZE => {
+                let return_data_size = last_context_ret
+                    .as_ref()
+                    .map(|r| U256::from(r.len()))
+                    .unwrap_or_default();
+
+                stack.push(return_data_size);
+            }
+            opcodes::RETURNDATACOPY => {
+                let dest_offset = stack.pop().unwrap().as_usize();
+                let offset = stack.pop().unwrap().as_usize();
+                let size = stack.pop().unwrap().as_usize();
+
+                let mut buf = vec![0u8; size];
+                last_context_ret.as_ref().unwrap()[offset..].clone_into(&mut buf);
+
+                write_memory(memory, dest_offset, buf);
             }
             opcodes::JUMPDEST => continue,
             opcodes::BLOCKHASH => continue, // NOTE: not implemented in the test suite

@@ -5,23 +5,28 @@ use serde::{de::Visitor, Deserialize};
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub struct SerializedU256 {
-    value: U256,
+    pub value: U256,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub struct SerializedBytes {
-    value: Vec<u8>,
+    pub value: Vec<u8>,
 }
 
 impl SerializedBytes {
     pub fn len(&self) -> usize {
         self.value.len()
     }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
-impl Into<Vec<u8>> for SerializedBytes {
-    fn into(self) -> Vec<u8> {
-        self.value
+impl From<SerializedBytes> for Vec<u8> {
+    fn from(val: SerializedBytes) -> Self {
+        val.value
     }
 }
 
@@ -31,9 +36,9 @@ impl From<Vec<u8>> for SerializedBytes {
     }
 }
 
-impl Into<U256> for SerializedU256 {
-    fn into(self) -> U256 {
-        self.value
+impl From<SerializedU256> for U256 {
+    fn from(val: SerializedU256) -> Self {
+        val.value
     }
 }
 
@@ -43,7 +48,7 @@ impl From<U256> for SerializedU256 {
     }
 }
 
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, PartialEq, Eq)]
 pub struct TxData {
     pub to: Option<SerializedU256>,
     pub from: Option<SerializedU256>,
@@ -53,7 +58,7 @@ pub struct TxData {
     pub data: Option<SerializedBytes>,
 }
 
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, PartialEq, Eq)]
 pub struct BlockData {
     pub basefee: Option<SerializedU256>,
     pub coinbase: Option<SerializedU256>,
@@ -64,13 +69,13 @@ pub struct BlockData {
     pub chainid: Option<SerializedU256>,
 }
 
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, PartialEq, Eq)]
 pub struct ContractsStateDataEntry {
     pub balance: Option<SerializedU256>,
     pub code: Option<ContractsStateDataEntryCode>,
 }
 
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, PartialEq, Eq)]
 pub struct ContractsStateDataEntryCode {
     pub bin: Option<SerializedBytes>,
 }
@@ -83,7 +88,7 @@ impl ContractsStateDataEntryCode {
 
 pub type ContractsStateData = HashMap<SerializedU256, ContractsStateDataEntry>;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BlockchainState {
     pub tx: TxData,
     pub block: BlockData,
