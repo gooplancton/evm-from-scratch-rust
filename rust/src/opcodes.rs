@@ -70,9 +70,11 @@ pub const LOG0: u8 = 0xa0;
 pub const LOG4: u8 = 0xa4;
 pub const RETURN: u8 = 0xf3;
 pub const REVERT: u8 = 0xfd;
+pub const CREATE: u8 = 0xf0;
 pub const CALL: u8 = 0xf1;
 pub const DELEGATECALL: u8 = 0xf4;
 pub const STATICCALL: u8 = 0xfa;
 pub const RETURNDATASIZE: u8 = 0x3d;
 pub const RETURNDATACOPY: u8 = 0x3e;
+pub const SELFDESTRUCT: u8 = 0xff;
 

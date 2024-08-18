@@ -204,6 +204,26 @@ pub fn evm(
 
                 write_memory(memory, dest_offset, buf);
             }
+            opcodes::CREATE => {
+                if is_static {
+                    let return_value = operations::revert_context(&mut stack, memory);
+                    ret = Some(return_value);
+                    success = false;
+                    break;
+                }
+
+                operations::create_contract(&mut stack, memory, storage, chain_state)
+            }
+            opcodes::SELFDESTRUCT => {
+                if is_static {
+                    let return_value = operations::revert_context(&mut stack, memory);
+                    ret = Some(return_value);
+                    success = false;
+                    break;
+                }
+
+                operations::self_destruct(&mut stack, chain_state)
+            }
             opcodes::JUMPDEST => continue,
             opcodes::BLOCKHASH => continue, // NOTE: not implemented in the test suite
             _ => {

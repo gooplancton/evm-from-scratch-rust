@@ -1,11 +1,3 @@
-use colored::Colorize;
-use evm::evm;
-use evm::state;
-use evm::EvmLog;
-use primitive_types::U256;
-use serde::Deserialize;
-use std::borrow::Borrow;
-use std::collections::HashMap;
 /**
  * EVM From Scratch
  * Rust template
@@ -20,7 +12,15 @@ use std::collections::HashMap;
  * gave up and switched to JavaScript, Python, or Go. If you are new
  * to Rust, implement EVM in another programming language first.
  */
+
 use std::mem;
+use colored::Colorize;
+use evm::evm;
+use evm::state;
+use evm::EvmLog;
+use primitive_types::U256;
+use serde::Deserialize;
+use std::collections::HashMap;
 
 #[derive(Debug, Deserialize)]
 struct Evmtest {
